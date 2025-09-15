@@ -242,8 +242,14 @@
     
     /* Responsive */
     @media (max-width: 768px) {
+        :root {
+            --sidebar-width: 100%;
+        }
+        
         .sidebar {
             transform: translateX(-100%);
+            width: 100%;
+            max-width: 300px;
         }
         
         .sidebar.mobile-open {
@@ -252,18 +258,102 @@
         
         .main-content {
             margin-left: 0;
+            width: 100%;
+        }
+        
+        .header {
+            padding: 0 15px;
         }
         
         .header-title {
-            font-size: 20px;
+            font-size: 18px;
         }
         
         .content {
-            padding: 20px;
+            padding: 15px;
         }
         
         .mobile-menu-toggle {
             display: block !important;
+        }
+        
+        /* Stats grid mobile optimization */
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            padding: 20px 15px;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+        }
+        
+        /* Card mobile optimization */
+        .card {
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            padding: 15px 20px;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+        }
+        
+        /* Header actions mobile layout */
+        .header-actions {
+            gap: 10px;
+        }
+        
+        .user-info {
+            font-size: 14px;
+        }
+        
+        .logout-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        
+        .header-title {
+            font-size: 16px;
+        }
+        
+        .content {
+            padding: 12px;
+        }
+        
+        .stat-card {
+            padding: 15px;
+        }
+        
+        .user-info span {
+            display: none;
+        }
+        
+        .logout-btn {
+            padding: 8px 12px;
+            font-size: 12px;
         }
     }
     
@@ -277,10 +367,30 @@
         background: rgba(0, 0, 0, 0.5);
         z-index: 999;
         display: none;
+        opacity: 0;
+        transition: var(--transition);
     }
     
     .mobile-overlay.show {
         display: block;
+        opacity: 1;
+    }
+    
+    /* Improve touch targets */
+    @media (max-width: 768px) {
+        .nav-item {
+            padding: 18px 25px;
+            font-size: 16px;
+        }
+        
+        .mobile-menu-toggle {
+            padding: 10px;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     }
 </style>
 {% endblock %}
@@ -392,17 +502,23 @@
     function openMobileMenu() {
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('mobileOverlay');
+        const body = document.body;
         
         sidebar.classList.add('mobile-open');
         overlay.classList.add('show');
+        // Prevent body scroll when menu is open
+        body.style.overflow = 'hidden';
     }
     
     function closeMobileMenu() {
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('mobileOverlay');
+        const body = document.body;
         
         sidebar.classList.remove('mobile-open');
         overlay.classList.remove('show');
+        // Restore body scroll
+        body.style.overflow = '';
     }
     
     // Close mobile menu when clicking on navigation items
@@ -422,6 +538,38 @@
             if (window.innerWidth > 768) {
                 closeMobileMenu();
             }
+        });
+        
+        // Handle swipe gestures to close menu
+        let startX = 0;
+        let startY = 0;
+        
+        document.addEventListener('touchstart', function(e) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            if (!startX || !startY) {
+                return;
+            }
+            
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+            
+            // Check if it's a left swipe (to close menu)
+            if (Math.abs(diffX) > Math.abs(diffY) && diffX > 50) {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar.classList.contains('mobile-open')) {
+                    closeMobileMenu();
+                }
+            }
+            
+            startX = 0;
+            startY = 0;
         });
     });
 </script>
