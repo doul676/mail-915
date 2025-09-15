@@ -1046,6 +1046,13 @@ def get_system_config(key, default_value=''):
         logger.error(f"Failed to get system config for key {key}: {e}")
         return default_value
 
+@app.context_processor
+def inject_system_title():
+    """注入系统标题到所有模板"""
+    return {
+        'system_title': get_system_config('system_title', '邮件查看系统')
+    }
+
 # ===============================
 # 管理员后台页面路由
 # ===============================
@@ -4945,6 +4952,7 @@ def api_admin_system_config():
                 'success': True,
                 'data': {
                     'system_name': system_config.get('system_name', '邮件查看系统'),
+                    'system_title': system_config.get('system_title', '邮件查看系统'),
                     'version': system_config.get('system_version', '2.0.0'),
                     'database_type': app.config['DATABASE_TYPE'],
                     'admin_username': current_admin_username,
@@ -4969,6 +4977,8 @@ def api_admin_system_config():
                 return _update_admin_account(db, db_type, data)
             elif action == 'update_page_titles':
                 return _update_page_titles(db, db_type, data)
+            elif action == 'update_system_title':
+                return _update_system_title(db, db_type, data)
             else:
                 return jsonify({
                     'success': False,
@@ -5132,6 +5142,71 @@ def _update_page_titles(db, db_type, data):
         return jsonify({
             'success': False,
             'message': f'更新页面标题失败: {str(e)}'
+        })
+
+def _update_system_title(db, db_type, data):
+    """更新系统标题设置"""
+    system_title = data.get('system_title', '').strip()
+    
+    if not system_title:
+        return jsonify({
+            'success': False,
+            'message': '系统标题不能为空'
+        })
+    
+    try:
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 更新或插入系统标题配置
+        if db_type == 'sqlite':
+            # 使用 INSERT OR REPLACE 语法
+            db.execute('''
+                INSERT OR REPLACE INTO system_config 
+                (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                VALUES ('system_title', ?, 'string', '系统页面标题', 0, 
+                    COALESCE((SELECT created_at FROM system_config WHERE config_key = 'system_title'), ?), 
+                    ?)
+            ''', (system_title, now, now))
+        else:
+            cursor = db.cursor()
+            if db_type == 'mysql':
+                # MySQL 使用 ON DUPLICATE KEY UPDATE
+                cursor.execute('''
+                    INSERT INTO system_config 
+                    (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                    VALUES ('system_title', %s, 'string', '系统页面标题', 0, %s, %s)
+                    ON DUPLICATE KEY UPDATE 
+                    config_value = VALUES(config_value), 
+                    updated_at = VALUES(updated_at)
+                ''', (system_title, now, now))
+            else:  # PostgreSQL
+                # PostgreSQL 使用 ON CONFLICT
+                cursor.execute('''
+                    INSERT INTO system_config 
+                    (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                    VALUES ('system_title', %s, 'string', '系统页面标题', 0, %s, %s)
+                    ON CONFLICT (config_key) DO UPDATE SET 
+                    config_value = EXCLUDED.config_value, 
+                    updated_at = EXCLUDED.updated_at
+                ''', (system_title, now, now))
+        
+        if db_type == 'sqlite':
+            db.commit()
+        else:
+            db.commit()
+        
+        logger.info(f"System title updated to: {system_title}")
+        
+        return jsonify({
+            'success': True,
+            'message': '系统标题更新成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"Update system title error: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'更新系统标题失败: {str(e)}'
         })
 
 if __name__ == '__main__':

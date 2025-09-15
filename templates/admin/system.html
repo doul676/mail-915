@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}系统设置 - 邮件查看系统{% endblock %}
+{% block title %}系统设置 - {{ system_title }}{% endblock %}
 
 {% block head %}
 <style>
@@ -400,6 +400,24 @@
             </div>
         </div>
 
+        <!-- 系统标题设置 -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🎯 系统标题设置</h2>
+            </div>
+            <div class="card-body">
+                <form id="systemTitleForm">
+                    <div class="form-group">
+                        <label class="form-label">系统名称/标题</label>
+                        <input type="text" class="form-control" id="systemTitle" name="system_title" 
+                               placeholder="邮件查看系统" value="邮件查看系统">
+                        <small style="color: #6b7280;">显示在后端管理页面标题中的系统名称，修改后即时生效</small>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="updateSystemTitle()">更新系统标题</button>
+                </form>
+            </div>
+        </div>
+
         <!-- 页面标题设置 -->
         <div class="card">
             <div class="card-header">
@@ -511,6 +529,11 @@
                     // 更新当前管理员用户名到输入框
                     if (data.data.admin_username) {
                         document.getElementById('adminUsername').value = data.data.admin_username;
+                    }
+                    
+                    // 更新系统标题设置
+                    if (data.data.system_title) {
+                        document.getElementById('systemTitle').value = data.data.system_title;
                     }
                     
                     // 更新页面标题设置
@@ -637,6 +660,44 @@
         })
         .catch(error => {
             console.error('更新页面标题失败:', error);
+            showToast('网络错误，请稍后重试', 'error');
+        });
+    }
+
+    // 更新系统标题
+    function updateSystemTitle() {
+        const systemTitle = document.getElementById('systemTitle').value.trim();
+
+        // 验证输入
+        if (!systemTitle) {
+            showToast('请输入系统标题', 'error');
+            return;
+        }
+
+        const data = {
+            action: 'update_system_title',
+            system_title: systemTitle
+        };
+
+        fetch('/admin/api/system-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('系统标题更新成功，页面标题将即时生效', 'success');
+                // 更新页面标题立即反映变化
+                document.title = document.title.replace(/- .+$/, '- ' + systemTitle);
+            } else {
+                showToast(data.message || '更新失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('更新系统标题失败:', error);
             showToast('网络错误，请稍后重试', 'error');
         });
     }
