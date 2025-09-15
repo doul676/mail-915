@@ -225,6 +225,21 @@
         letter-spacing: 0.5px;
     }
     
+    /* Mobile menu toggle - default hidden */
+    .mobile-menu-toggle {
+        display: none;
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #64748b;
+        transition: var(--transition);
+    }
+    
+    .mobile-menu-toggle:hover {
+        color: var(--primary-color);
+    }
+    
     /* Responsive */
     @media (max-width: 768px) {
         .sidebar {
@@ -248,21 +263,8 @@
         }
         
         .mobile-menu-toggle {
-            display: block;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #64748b;
+            display: block !important;
         }
-        
-        .mobile-menu-toggle:hover {
-            color: var(--primary-color);
-        }
-    }
-    
-    .mobile-menu-toggle {
-        display: none;
     }
     
     /* Mobile overlay */
