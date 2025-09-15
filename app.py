@@ -3955,10 +3955,170 @@ def api_admin_generate_card_api_page(card_key):
             border: 1px solid #e5e7eb;
             max-height: 400px;
             overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.6;
+        }}
+        
+        .mail-body.text-content {{
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+        }}
+        
+        .mail-body.html-content {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }}
+        
+        .mail-body.html-content a {{
+            color: #667eea;
+            text-decoration: none;
+        }}
+        
+        .mail-body.html-content a:hover {{
+            color: #764ba2;
+            text-decoration: underline;
+        }}
+        
+        /* Images section styles */
+        .mail-images {{
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            margin-top: 15px;
+        }}
+        
+        .image-container {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }}
+        
+        .image-item {{
+            background: #f8fafc;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }}
+        
+        .image-item:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }}
+        
+        .image-item img {{
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            cursor: pointer;
+        }}
+        
+        .image-info {{
+            padding: 10px;
+        }}
+        
+        .attachment-name {{
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }}
+        
+        .attachment-meta {{
+            font-size: 12px;
+            color: #6b7280;
+        }}
+        
+        /* Attachments section styles */
+        .mail-attachments {{
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            margin-top: 15px;
+        }}
+        
+        .attachment-list {{
+            margin-top: 10px;
+        }}
+        
+        .attachment-item {{
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: background 0.2s ease;
+        }}
+        
+        .attachment-item:hover {{
+            background: #e5e7eb;
+        }}
+        
+        .attachment-icon {{
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 12px;
+        }}
+        
+        .attachment-details {{
+            flex: 1;
+        }}
+        
+        .attachment-size {{
+            color: #6b7280;
+            font-size: 12px;
+        }}
+        
+        /* Image Modal styles */
+        .image-modal {{
+            display: none;
+            position: fixed;
+            z-index: 4000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }}
+        
+        .image-modal-content {{
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 700px;
+            max-height: 80%;
+            animation: zoom 0.3s;
+        }}
+        
+        @keyframes zoom {{
+            from {{transform: scale(0)}}
+            to {{transform: scale(1)}}
+        }}
+        
+        .image-modal-close {{
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }}
+        
+        .image-modal-close:hover,
+        .image-modal-close:focus {{
+            color: #bbb;
+            text-decoration: none;
         }}
         
         .api-info {{
@@ -4070,7 +4230,25 @@ def api_admin_generate_card_api_page(card_key):
             </div>
             
             <div class="mail-body" id="mailBody"></div>
+            
+            <!-- Images section -->
+            <div class="mail-images" id="mailImages" style="display: none;">
+                <h4 style="color: #667eea; margin-bottom: 10px;">📷 图片内容</h4>
+                <div class="image-container" id="imageContainer"></div>
+            </div>
+            
+            <!-- Attachments section -->
+            <div class="mail-attachments" id="mailAttachments" style="display: none;">
+                <h4 style="color: #667eea; margin-bottom: 10px;">📎 附件</h4>
+                <div class="attachment-list" id="attachmentList"></div>
+            </div>
         </div>
+    </div>
+    
+    <!-- Image Modal -->
+    <div id="imageModal" class="image-modal">
+        <span class="image-modal-close" onclick="closeImageModal()">&times;</span>
+        <img class="image-modal-content" id="modalImage">
     </div>
     
     <script>
@@ -4159,11 +4337,29 @@ def api_admin_generate_card_api_page(card_key):
         
         function displayMail(mail) {{
             document.getElementById('mailSubject').textContent = mail.subject || '(无主题)';
+            
+            // 显示发件人信息（后端已格式化为"名称 <邮箱地址>"格式）
             document.getElementById('mailFrom').textContent = mail.from || '未知';
+            
             document.getElementById('mailTo').textContent = mail.to || '未知';
             document.getElementById('mailDate').textContent = mail.date || '未知';
             document.getElementById('mailSize').textContent = formatFileSize(mail.size || 0);
-            document.getElementById('mailBody').textContent = mail.body || '(邮件内容为空)';
+            
+            // 显示邮件正文
+            const mailBodyElement = document.getElementById('mailBody');
+            if (mail.body_type === 'html') {{
+                mailBodyElement.innerHTML = mail.body || '(邮件内容为空)';
+                mailBodyElement.className = 'mail-body html-content';
+            }} else {{
+                mailBodyElement.textContent = mail.body || '(邮件内容为空)';
+                mailBodyElement.className = 'mail-body text-content';
+            }}
+            
+            // 显示图片
+            displayImages(mail.images || []);
+            
+            // 显示附件
+            displayAttachments(mail.attachments || []);
             
             document.getElementById('mailDisplay').style.display = 'block';
         }}
@@ -4212,6 +4408,108 @@ def api_admin_generate_card_api_page(card_key):
                     }}
                 }}, 300);
             }}, duration);
+        }}
+        
+        function displayImages(images) {{
+            const imagesSection = document.getElementById('mailImages');
+            const imageContainer = document.getElementById('imageContainer');
+            
+            if (images && images.length > 0) {{
+                imageContainer.innerHTML = '';
+                
+                images.forEach((image, index) => {{
+                    const imageItem = document.createElement('div');
+                    imageItem.className = 'image-item';
+                    
+                    const img = document.createElement('img');
+                    img.src = 'data:' + image.mime_type + ';base64,' + image.content;
+                    img.alt = image.filename;
+                    img.onclick = () => openImageModal(img.src);
+                    
+                    const imageInfo = document.createElement('div');
+                    imageInfo.className = 'image-info';
+                    imageInfo.innerHTML = `
+                        <div class="attachment-name">${{escapeHtml(image.filename)}}</div>
+                        <div class="attachment-meta">${{formatFileSize(image.size)}} • ${{image.mime_type}}</div>
+                    `;
+                    
+                    imageItem.appendChild(img);
+                    imageItem.appendChild(imageInfo);
+                    imageContainer.appendChild(imageItem);
+                }});
+                
+                imagesSection.style.display = 'block';
+            }} else {{
+                imagesSection.style.display = 'none';
+            }}
+        }}
+        
+        function displayAttachments(attachments) {{
+            const attachmentsSection = document.getElementById('mailAttachments');
+            const attachmentList = document.getElementById('attachmentList');
+            
+            if (attachments && attachments.length > 0) {{
+                attachmentList.innerHTML = '';
+                
+                attachments.forEach((attachment, index) => {{
+                    const attachmentItem = document.createElement('div');
+                    attachmentItem.className = 'attachment-item';
+                    
+                    const fileExt = attachment.filename.split('.').pop()?.toUpperCase() || '?';
+                    
+                    attachmentItem.innerHTML = `
+                        <div class="attachment-icon">${{fileExt.substring(0, 3)}}</div>
+                        <div class="attachment-details">
+                            <div class="attachment-name">${{escapeHtml(attachment.filename)}}</div>
+                            <div class="attachment-size">${{formatFileSize(attachment.size)}} • ${{attachment.mime_type}}</div>
+                        </div>
+                    `;
+                    
+                    attachmentList.appendChild(attachmentItem);
+                }});
+                
+                attachmentsSection.style.display = 'block';
+            }} else {{
+                attachmentsSection.style.display = 'none';
+            }}
+        }}
+        
+        // Image modal functions
+        function openImageModal(src) {{
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'block';
+            modalImg.src = src;
+        }}
+        
+        function closeImageModal() {{
+            document.getElementById('imageModal').style.display = 'none';
+        }}
+        
+        // Click outside modal to close
+        document.getElementById('imageModal').onclick = function(event) {{
+            if (event.target === this) {{
+                closeImageModal();
+            }}
+        }}
+        
+        // Escape key to close modal
+        document.addEventListener('keydown', function(event) {{
+            if (event.key === 'Escape') {{
+                closeImageModal();
+            }}
+        }});
+        
+        // Utility functions
+        function escapeHtml(text) {{
+            const map = {{
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }};
+            return text.replace(/[&<>"']/g, function(m) {{ return map[m]; }});
         }}
         
         function formatFileSize(bytes) {{
@@ -4311,13 +4609,21 @@ def api_admin_recycle_bin():
 @app.route('/admin/api/recycle-bin/restore', methods=['POST'])
 @admin_required
 def api_admin_restore_card():
-    """恢复卡密 API"""
+    """恢复卡密 API (支持单个和批量)"""
     try:
         data = request.get_json()
         card_id = data.get('card_id')
+        card_ids = data.get('card_ids')
         recycle_type = data.get('type', 'deleted')
         
-        if not card_id:
+        # 确定要恢复的卡密ID列表
+        if card_ids:
+            # 批量恢复
+            ids_to_restore = card_ids
+        elif card_id:
+            # 单个恢复
+            ids_to_restore = [card_id]
+        else:
             return jsonify({
                 'success': False,
                 'message': '缺少卡密ID'
@@ -4326,59 +4632,78 @@ def api_admin_restore_card():
         db = get_db()
         db_type = app.config['DATABASE_TYPE']
         
-        # 获取回收站中的卡密信息
-        if db_type == 'sqlite':
-            recycled_card = db.execute('SELECT * FROM card_recycle_bin WHERE id = ?', (card_id,)).fetchone()
-        else:
-            cursor = db.cursor()
-            cursor.execute('SELECT * FROM card_recycle_bin WHERE id = %s', (card_id,))
-            recycled_card = cursor.fetchone()
+        restored_count = 0
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        if not recycled_card:
+        for card_id in ids_to_restore:
+            try:
+                # 获取回收站中的卡密信息
+                if db_type == 'sqlite':
+                    recycled_card = db.execute('SELECT * FROM card_recycle_bin WHERE id = ?', (card_id,)).fetchone()
+                else:
+                    cursor = db.cursor()
+                    cursor.execute('SELECT * FROM card_recycle_bin WHERE id = %s', (card_id,))
+                    recycled_card = cursor.fetchone()
+                
+                if not recycled_card:
+                    continue
+                
+                # 转换为字典
+                if db_type == 'sqlite':
+                    card_data = dict(recycled_card)
+                else:
+                    columns = [desc[0] for desc in cursor.description]
+                    card_data = dict(zip(columns, recycled_card))
+                
+                # 恢复到主卡密表
+                if db_type == 'sqlite':
+                    db.execute('''
+                        INSERT INTO cards (card_key, usage_limit, used_count, expired_at, bound_email_id, 
+                                         email_days_filter, sender_filter, remarks, status, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    ''', (card_data['card_key'], card_data['usage_limit'], card_data['used_count'],
+                          card_data['expired_at'], card_data['bound_email_id'], card_data['email_days_filter'],
+                          card_data['sender_filter'], card_data['remarks'], card_data['created_at'], now))
+                    
+                    # 从回收站删除
+                    db.execute('DELETE FROM card_recycle_bin WHERE id = ?', (card_id,))
+                else:
+                    cursor = db.cursor()
+                    cursor.execute('''
+                        INSERT INTO cards (card_key, usage_limit, used_count, expired_at, bound_email_id, 
+                                         email_days_filter, sender_filter, remarks, status, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s)
+                    ''', (card_data['card_key'], card_data['usage_limit'], card_data['used_count'],
+                          card_data['expired_at'], card_data['bound_email_id'], card_data['email_days_filter'],
+                          card_data['sender_filter'], card_data['remarks'], card_data['created_at'], now))
+                    
+                    # 从回收站删除
+                    cursor.execute('DELETE FROM card_recycle_bin WHERE id = %s', (card_id,))
+                
+                restored_count += 1
+                
+            except Exception as e:
+                logger.error(f"Error restoring card {card_id}: {e}")
+                continue
+        
+        # 提交所有更改
+        if db_type == 'sqlite':
+            db.commit()
+        else:
+            db.commit()
+        
+        if restored_count > 0:
+            message = f'成功恢复 {restored_count} 个卡密' if restored_count > 1 else '卡密恢复成功'
+            return jsonify({
+                'success': True,
+                'message': message,
+                'restored_count': restored_count
+            })
+        else:
             return jsonify({
                 'success': False,
-                'message': '回收站中未找到该卡密'
+                'message': '没有找到可恢复的卡密'
             })
-        
-        # 转换为字典
-        if db_type == 'sqlite':
-            card_data = dict(recycled_card)
-        else:
-            columns = [desc[0] for desc in cursor.description]
-            card_data = dict(zip(columns, recycled_card))
-        
-        # 恢复到主卡密表
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        if db_type == 'sqlite':
-            db.execute('''
-                INSERT INTO cards (card_key, usage_limit, used_count, expired_at, bound_email_id, 
-                                 email_days_filter, sender_filter, remarks, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-            ''', (card_data['card_key'], card_data['usage_limit'], card_data['used_count'],
-                  card_data['expired_at'], card_data['bound_email_id'], card_data['email_days_filter'],
-                  card_data['sender_filter'], card_data['remarks'], card_data['created_at'], now))
-            
-            # 从回收站删除
-            db.execute('DELETE FROM card_recycle_bin WHERE id = ?', (card_id,))
-            db.commit()
-        else:
-            cursor = db.cursor()
-            cursor.execute('''
-                INSERT INTO cards (card_key, usage_limit, used_count, expired_at, bound_email_id, 
-                                 email_days_filter, sender_filter, remarks, status, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s)
-            ''', (card_data['card_key'], card_data['usage_limit'], card_data['used_count'],
-                  card_data['expired_at'], card_data['bound_email_id'], card_data['email_days_filter'],
-                  card_data['sender_filter'], card_data['remarks'], card_data['created_at'], now))
-            
-            # 从回收站删除
-            cursor.execute('DELETE FROM card_recycle_bin WHERE id = %s', (card_id,))
-            db.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': '卡密恢复成功'
-        })
         
     except Exception as e:
         logger.error(f"Restore card error: {e}")
@@ -4390,12 +4715,20 @@ def api_admin_restore_card():
 @app.route('/admin/api/recycle-bin/permanent-delete', methods=['DELETE'])
 @admin_required
 def api_admin_permanent_delete_card():
-    """永久删除卡密 API"""
+    """永久删除卡密 API (支持单个和批量)"""
     try:
         data = request.get_json()
         card_id = data.get('card_id')
+        card_ids = data.get('card_ids')
         
-        if not card_id:
+        # 确定要删除的卡密ID列表
+        if card_ids:
+            # 批量删除
+            ids_to_delete = card_ids
+        elif card_id:
+            # 单个删除
+            ids_to_delete = [card_id]
+        else:
             return jsonify({
                 'success': False,
                 'message': '缺少卡密ID'
@@ -4404,18 +4737,41 @@ def api_admin_permanent_delete_card():
         db = get_db()
         db_type = app.config['DATABASE_TYPE']
         
+        deleted_count = 0
+        
+        for card_id in ids_to_delete:
+            try:
+                if db_type == 'sqlite':
+                    result = db.execute('DELETE FROM card_recycle_bin WHERE id = ?', (card_id,))
+                    if result.rowcount > 0:
+                        deleted_count += 1
+                else:
+                    cursor = db.cursor()
+                    cursor.execute('DELETE FROM card_recycle_bin WHERE id = %s', (card_id,))
+                    if cursor.rowcount > 0:
+                        deleted_count += 1
+            except Exception as e:
+                logger.error(f"Error deleting card {card_id}: {e}")
+                continue
+        
+        # 提交所有更改
         if db_type == 'sqlite':
-            db.execute('DELETE FROM card_recycle_bin WHERE id = ?', (card_id,))
             db.commit()
         else:
-            cursor = db.cursor()
-            cursor.execute('DELETE FROM card_recycle_bin WHERE id = %s', (card_id,))
             db.commit()
         
-        return jsonify({
-            'success': True,
-            'message': '卡密永久删除成功'
-        })
+        if deleted_count > 0:
+            message = f'成功永久删除 {deleted_count} 个卡密' if deleted_count > 1 else '卡密永久删除成功'
+            return jsonify({
+                'success': True,
+                'message': message,
+                'deleted_count': deleted_count
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '没有找到可删除的卡密'
+            })
         
     except Exception as e:
         logger.error(f"Permanent delete card error: {e}")

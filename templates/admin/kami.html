@@ -953,10 +953,21 @@
                     <!-- 已删除的卡密 -->
                     <div id="deletedCardsContent" style="display: none;">
                         <h4 style="color: #ef4444; margin-bottom: 15px;">已删除的卡密</h4>
+                        <div id="deletedBatchActions" style="margin-bottom: 10px; display: none;">
+                            <button class="btn btn-primary btn-sm" onclick="batchRestoreRecycleItems('deleted')" id="batchRestoreDeletedBtn">
+                                🔄 批量恢复 (0)
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="batchPermanentDeleteRecycleItems('deleted')" id="batchDeleteDeletedBtn">
+                                🗑️ 批量永久删除 (0)
+                            </button>
+                        </div>
                         <div class="table-container">
                             <table class="table">
                                 <thead>
                                     <tr>
+                                        <th>
+                                            <input type="checkbox" id="selectAllDeleted" onchange="toggleSelectAllRecycleItems('deleted')">
+                                        </th>
                                         <th>序号</th>
                                         <th>卡密</th>
                                         <th>使用次数</th>
@@ -975,10 +986,21 @@
                     <!-- 已过期的卡密 -->
                     <div id="expiredCardsContent" style="display: none;">
                         <h4 style="color: #f59e0b; margin-bottom: 15px;">已过期的卡密</h4>
+                        <div id="expiredBatchActions" style="margin-bottom: 10px; display: none;">
+                            <button class="btn btn-primary btn-sm" onclick="batchRestoreRecycleItems('expired')" id="batchRestoreExpiredBtn">
+                                🔄 批量恢复 (0)
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="batchPermanentDeleteRecycleItems('expired')" id="batchDeleteExpiredBtn">
+                                🗑️ 批量永久删除 (0)
+                            </button>
+                        </div>
                         <div class="table-container">
                             <table class="table">
                                 <thead>
                                     <tr>
+                                        <th>
+                                            <input type="checkbox" id="selectAllExpired" onchange="toggleSelectAllRecycleItems('expired')">
+                                        </th>
                                         <th>序号</th>
                                         <th>卡密</th>
                                         <th>使用次数</th>
@@ -1812,7 +1834,7 @@
         if (cards.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: #6b7280;">
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
                         暂无${type === 'deleted' ? '已删除' : '已过期'}的卡密
                     </td>
                 </tr>
@@ -1822,6 +1844,10 @@
         
         tbody.innerHTML = cards.map((card, index) => `
             <tr>
+                <td>
+                    <input type="checkbox" class="recycle-checkbox recycle-checkbox-${type}" 
+                           value="${card.id}" onchange="toggleRecycleItemSelection('${type}')">
+                </td>
                 <td>${index + 1}</td>
                 <td>
                     <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-family: monospace;">
@@ -1841,6 +1867,9 @@
                 </td>
             </tr>
         `).join('');
+        
+        // Reset selection state when data is refreshed
+        updateRecycleBatchActions(type);
     }
     
     // 更新回收站计数
@@ -1935,6 +1964,130 @@
         })
         .catch(error => {
             console.error('清空回收站失败:', error);
+            showToast('网络错误，请稍后重试', 'error');
+        });
+    }
+    
+    // ========== 回收站多选功能 ==========
+    
+    // 切换回收站项目选择状态
+    function toggleRecycleItemSelection(type) {
+        updateRecycleBatchActions(type);
+    }
+    
+    // 全选/取消全选回收站项目
+    function toggleSelectAllRecycleItems(type) {
+        const selectAll = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}`);
+        const checkboxes = document.querySelectorAll(`.recycle-checkbox-${type}`);
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAll.checked;
+        });
+        
+        updateRecycleBatchActions(type);
+    }
+    
+    // 更新批量操作按钮状态
+    function updateRecycleBatchActions(type) {
+        const checkboxes = document.querySelectorAll(`.recycle-checkbox-${type}`);
+        const checkedCount = document.querySelectorAll(`.recycle-checkbox-${type}:checked`).length;
+        const selectAll = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}`);
+        
+        // 更新全选框状态
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        selectAll.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+        
+        // 显示/隐藏批量操作按钮
+        const batchActions = document.getElementById(`${type}BatchActions`);
+        const restoreBtn = document.getElementById(`batchRestore${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+        const deleteBtn = document.getElementById(`batchDelete${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+        
+        if (checkedCount > 0) {
+            batchActions.style.display = 'block';
+            restoreBtn.textContent = `🔄 批量恢复 (${checkedCount})`;
+            deleteBtn.textContent = `🗑️ 批量永久删除 (${checkedCount})`;
+        } else {
+            batchActions.style.display = 'none';
+        }
+    }
+    
+    // 批量恢复回收站项目
+    function batchRestoreRecycleItems(type) {
+        const checkboxes = document.querySelectorAll(`.recycle-checkbox-${type}:checked`);
+        const cardIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        
+        if (cardIds.length === 0) {
+            showToast('请先选择要恢复的卡密', 'warning');
+            return;
+        }
+        
+        const typeText = type === 'deleted' ? '已删除' : '已过期';
+        if (!confirm(`确定要批量恢复选中的 ${cardIds.length} 个${typeText}卡密吗？恢复后将重新出现在卡密列表中。`)) {
+            return;
+        }
+        
+        fetch('/admin/api/recycle-bin/restore', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                card_ids: cardIds,
+                type: type
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('批量恢复成功', 'success');
+                loadRecycleBinData();
+                refreshCardList();
+            } else {
+                showToast(data.message || '批量恢复失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('批量恢复失败:', error);
+            showToast('网络错误，请稍后重试', 'error');
+        });
+    }
+    
+    // 批量永久删除回收站项目
+    function batchPermanentDeleteRecycleItems(type) {
+        const checkboxes = document.querySelectorAll(`.recycle-checkbox-${type}:checked`);
+        const cardIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        
+        if (cardIds.length === 0) {
+            showToast('请先选择要删除的卡密', 'warning');
+            return;
+        }
+        
+        const typeText = type === 'deleted' ? '已删除' : '已过期';
+        if (!confirm(`确定要永久删除选中的 ${cardIds.length} 个${typeText}卡密吗？此操作不可恢复！`)) {
+            return;
+        }
+        
+        fetch('/admin/api/recycle-bin/permanent-delete', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                card_ids: cardIds,
+                type: type
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('批量删除成功', 'success');
+                loadRecycleBinData();
+            } else {
+                showToast(data.message || '批量删除失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('批量删除失败:', error);
             showToast('网络错误，请稍后重试', 'error');
         });
     }
