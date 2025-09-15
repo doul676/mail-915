@@ -621,6 +621,79 @@
         border-color: #3b82f6;
         color: #1e40af;
     }
+    
+    /* Mobile menu toggle - default hidden */
+    .mobile-menu-toggle {
+        display: none;
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #64748b;
+        transition: var(--transition);
+    }
+    
+    .mobile-menu-toggle:hover {
+        color: var(--primary-color);
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .sidebar {
+            transform: translateX(-100%);
+        }
+        
+        .sidebar.mobile-open {
+            transform: translateX(0);
+        }
+        
+        .main-content {
+            margin-left: 0;
+        }
+        
+        .header-title {
+            font-size: 20px;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .mobile-menu-toggle {
+            display: block !important;
+        }
+        
+        .card-header {
+            flex-direction: column;
+            gap: 15px;
+            align-items: flex-start;
+        }
+        
+        .modal-content {
+            width: 95%;
+            margin: 20px;
+        }
+        
+        .table-container {
+            font-size: 12px;
+        }
+    }
+    
+    /* Mobile overlay */
+    .mobile-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+    }
+    
+    .mobile-overlay.show {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -628,8 +701,11 @@
 <!-- Toast notification container -->
 <div id="toast-container" class="toast-container"></div>
 
+<!-- Mobile overlay -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
+
 <!-- Sidebar -->
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <div class="sidebar-logo">📧 邮件管理系统</div>
     </div>
@@ -661,7 +737,10 @@
 <!-- Main Content -->
 <div class="main-content">
     <div class="header">
-        <h1 class="header-title">卡密管理</h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+            <h1 class="header-title">卡密管理</h1>
+        </div>
         <div class="header-actions">
             <div class="user-info">
                 <span>欢迎，{{ admin_username }}</span>
@@ -1029,6 +1108,44 @@
 
 {% block scripts %}
 <script>
+    // Mobile menu functionality
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        
+        if (sidebar.classList.contains('mobile-open')) {
+            closeMobileMenu();
+        } else {
+            openMobileMenu();
+        }
+    }
+    
+    function openMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        
+        sidebar.classList.add('mobile-open');
+        overlay.classList.add('show');
+    }
+    
+    function closeMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('show');
+    }
+    
+    // Close mobile menu when clicking on navigation items
+    document.addEventListener('DOMContentLoaded', function() {
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                closeMobileMenu();
+            });
+        });
+    });
+
     // 全局变量
     let currentPage = 1;
     let perPage = 20;
