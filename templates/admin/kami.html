@@ -782,8 +782,8 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">过期时间</label>
-                        <input type="datetime-local" class="form-control" name="expired_at">
-                        <small style="color: #6b7280;">留空则永不过期</small>
+                        <input type="text" class="form-control" name="expired_at" placeholder="如：1天、30天、999天，或留空表示永不过期">
+                        <small style="color: #6b7280;">支持天数格式（如"1天""30天""999天"），留空则永不过期</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">备注</label>
@@ -818,8 +818,8 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">过期时间</label>
-                        <input type="datetime-local" class="form-control" name="expired_at">
-                        <small style="color: #6b7280;">留空则永不过期</small>
+                        <input type="text" class="form-control" name="expired_at" placeholder="如：1天、30天、999天，或留空表示永不过期">
+                        <small style="color: #6b7280;">支持天数格式（如"1天""30天""999天"），留空则永不过期</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">备注</label>
@@ -905,7 +905,8 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">过期时间</label>
-                            <input type="datetime-local" class="form-control" name="expired_at" id="editExpiredAt">
+                            <input type="text" class="form-control" name="expired_at" id="editExpiredAt" placeholder="如：1天、30天、999天，或留空表示永不过期">
+                            <small style="color: #6b7280;">支持天数格式（如"1天""30天""999天"），留空则永不过期</small>
                         </div>
                     </div>
                     
@@ -1410,15 +1411,67 @@
         document.getElementById(modalId).classList.remove('show');
     }
 
+    // 解析天数格式的过期时间，转换为datetime-local格式
+    function parseExpiryTime(input) {
+        if (!input || input.trim() === '') {
+            return null; // 空值表示永不过期
+        }
+        
+        const trimmedInput = input.trim();
+        
+        // 匹配天数格式，支持：1天、30天、999天等
+        const dayMatch = trimmedInput.match(/^(\d+)天$/);
+        if (dayMatch) {
+            const days = parseInt(dayMatch[1]);
+            if (days > 0 && days <= 9999) { // 限制合理范围
+                const now = new Date();
+                const expiryDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+                // 转换为ISO格式但移除秒和毫秒，适配datetime-local
+                return expiryDate.toISOString().slice(0, 16);
+            }
+        }
+        
+        // 如果不是天数格式，检查是否是已经的datetime-local格式
+        const datetimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+        if (datetimePattern.test(trimmedInput)) {
+            return trimmedInput;
+        }
+        
+        // 其他格式暂不支持，返回null
+        return null;
+    }
+
+    // 格式化过期时间显示（从datetime转为天数格式显示）
+    function formatExpiryTimeForDisplay(datetimeStr) {
+        if (!datetimeStr) {
+            return '';
+        }
+        
+        const expiryDate = new Date(datetimeStr);
+        const now = new Date();
+        const diffTime = expiryDate.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 0) {
+            return `${diffDays}天`;
+        } else {
+            return datetimeStr; // 如果已过期或无法计算，显示原始格式
+        }
+    }
+
     // 生成单个卡密
     function generateCard() {
         const form = document.getElementById('generateForm');
         const formData = new FormData(form);
         
+        // 解析过期时间
+        const expiredAtInput = formData.get('expired_at') || '';
+        const expiredAtParsed = parseExpiryTime(expiredAtInput);
+        
         const data = {
             action: 'generate',
             usage_limit: parseInt(formData.get('usage_limit')),
-            expired_at: formData.get('expired_at') || null,
+            expired_at: expiredAtParsed,
             remarks: formData.get('remarks') || ''
         };
 
@@ -1450,11 +1503,15 @@
         const form = document.getElementById('batchGenerateForm');
         const formData = new FormData(form);
         
+        // 解析过期时间
+        const expiredAtInput = formData.get('expired_at') || '';
+        const expiredAtParsed = parseExpiryTime(expiredAtInput);
+        
         const data = {
             action: 'batch_generate',
             count: parseInt(formData.get('count')),
             usage_limit: parseInt(formData.get('usage_limit')),
-            expired_at: formData.get('expired_at') || null,
+            expired_at: expiredAtParsed,
             remarks: formData.get('remarks') || ''
         };
 
@@ -1651,7 +1708,7 @@
         document.getElementById('editCardId').value = card.id;
         document.getElementById('editCardKey').value = card.card_key;
         document.getElementById('editUsageLimit').value = card.usage_limit || 1;
-        document.getElementById('editExpiredAt').value = card.expired_at ? formatDateTimeForInput(card.expired_at) : '';
+        document.getElementById('editExpiredAt').value = card.expired_at ? formatExpiryTimeForDisplay(card.expired_at) : '';
         document.getElementById('editRemarks').value = getCardRemarks(card.remarks) || '';
         document.getElementById('editBoundEmailId').value = card.bound_email_id || '';
         document.getElementById('editEmailDaysFilter').value = card.email_days_filter || 1;
@@ -1668,11 +1725,15 @@
         const form = document.getElementById('editForm');
         const formData = new FormData(form);
         
+        // 解析过期时间
+        const expiredAtInput = formData.get('expired_at') || '';
+        const expiredAtParsed = parseExpiryTime(expiredAtInput);
+        
         const data = {
             action: 'edit',
             card_id: parseInt(formData.get('card_id')),
             usage_limit: parseInt(formData.get('usage_limit')),
-            expired_at: formData.get('expired_at') || null,
+            expired_at: expiredAtParsed,
             remarks: formData.get('remarks') || '',
             bound_email_id: formData.get('bound_email_id') ? parseInt(formData.get('bound_email_id')) : null,
             email_days_filter: parseInt(formData.get('email_days_filter')) || 1,

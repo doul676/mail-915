@@ -4222,10 +4222,6 @@ def api_admin_generate_card_api_page(card_key):
                         <span class="mail-meta-label">时间:</span>
                         <span id="mailDate"></span>
                     </div>
-                    <div class="mail-meta-item">
-                        <span class="mail-meta-label">大小:</span>
-                        <span id="mailSize"></span>
-                    </div>
                 </div>
             </div>
             
@@ -4343,7 +4339,6 @@ def api_admin_generate_card_api_page(card_key):
             
             document.getElementById('mailTo').textContent = mail.to || '未知';
             document.getElementById('mailDate').textContent = mail.date || '未知';
-            document.getElementById('mailSize').textContent = formatFileSize(mail.size || 0);
             
             // 显示邮件正文
             const mailBodyElement = document.getElementById('mailBody');
