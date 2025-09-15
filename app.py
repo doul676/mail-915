@@ -4839,21 +4839,219 @@ def api_admin_mail_logs():
 @app.route('/admin/api/system-config', methods=['GET', 'POST'])
 @admin_required
 def api_admin_system_config():
-    """系统设置 API（Stub实现）"""
+    """系统设置 API"""
+    db = get_db()
+    db_type = app.config['DATABASE_TYPE']
+    
     if request.method == 'GET':
+        try:
+            # 获取当前管理员信息
+            current_admin_username = session.get('admin_username', 'admin')
+            
+            # 获取系统配置
+            system_config = {}
+            if db_type == 'sqlite':
+                config_rows = db.execute('SELECT config_key, config_value FROM system_config').fetchall()
+                for row in config_rows:
+                    system_config[row['config_key']] = row['config_value']
+            else:
+                cursor = db.cursor()
+                cursor.execute('SELECT config_key, config_value FROM system_config')
+                config_rows = cursor.fetchall()
+                for row in config_rows:
+                    system_config[row[0]] = row[1]
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'system_name': system_config.get('system_name', '邮件查看系统'),
+                    'version': system_config.get('system_version', '2.0.0'),
+                    'database_type': app.config['DATABASE_TYPE'],
+                    'admin_username': current_admin_username,
+                    'api_page_title': system_config.get('api_page_title', 'API取件页面'),
+                    'frontend_page_title': system_config.get('frontend_page_title', '邮件查看'),
+                    'admin_login_title': system_config.get('admin_login_title', '管理员登录')
+                }
+            })
+        except Exception as e:
+            logger.error(f"Get system config error: {e}")
+            return jsonify({
+                'success': False,
+                'message': f'获取系统设置失败: {str(e)}'
+            })
+    
+    else:  # POST
+        try:
+            data = request.get_json()
+            action = data.get('action')
+            
+            if action == 'update_admin':
+                return _update_admin_account(db, db_type, data)
+            elif action == 'update_page_titles':
+                return _update_page_titles(db, db_type, data)
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '未知的操作类型'
+                })
+                
+        except Exception as e:
+            logger.error(f"Update system config error: {e}")
+            return jsonify({
+                'success': False,
+                'message': f'更新系统设置失败: {str(e)}'
+            })
+
+def _update_admin_account(db, db_type, data):
+    """更新管理员账号"""
+    new_username = data.get('admin_username', '').strip()
+    new_password = data.get('admin_password', '').strip()
+    
+    if not new_username or not new_password:
         return jsonify({
-            'success': True,
-            'message': '系统设置功能正在开发中',
-            'data': {
-                'system_name': '邮件查看系统',
-                'version': '2.0.0',
-                'database_type': app.config['DATABASE_TYPE']
-            }
+            'success': False,
+            'message': '用户名和密码不能为空'
         })
-    else:
+    
+    if len(new_password) < 4:
+        return jsonify({
+            'success': False,
+            'message': '密码长度至少4位'
+        })
+    
+    try:
+        current_admin_id = session.get('admin_id')
+        
+        if db_type == 'sqlite':
+            # 检查新用户名是否已存在（排除当前用户）
+            existing_user = db.execute(
+                'SELECT id FROM admin_users WHERE username = ? AND id != ?', 
+                (new_username, current_admin_id)
+            ).fetchone()
+            
+            if existing_user:
+                return jsonify({
+                    'success': False,
+                    'message': '用户名已存在'
+                })
+            
+            # 更新管理员账号
+            db.execute(
+                'UPDATE admin_users SET username = ?, password = ? WHERE id = ?',
+                (new_username, new_password, current_admin_id)
+            )
+            db.commit()
+        else:
+            cursor = db.cursor()
+            # 检查新用户名是否已存在（排除当前用户）
+            cursor.execute(
+                'SELECT id FROM admin_users WHERE username = %s AND id != %s', 
+                (new_username, current_admin_id)
+            )
+            existing_user = cursor.fetchone()
+            
+            if existing_user:
+                return jsonify({
+                    'success': False,
+                    'message': '用户名已存在'
+                })
+            
+            # 更新管理员账号
+            cursor.execute(
+                'UPDATE admin_users SET username = %s, password = %s WHERE id = %s',
+                (new_username, new_password, current_admin_id)
+            )
+            db.commit()
+        
+        # 更新会话信息
+        session['admin_username'] = new_username
+        
+        logger.info(f"Admin account updated: {new_username}")
+        
         return jsonify({
             'success': True,
-            'message': '设置保存成功（开发中）'
+            'message': '管理员账号更新成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"Update admin account error: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'更新管理员账号失败: {str(e)}'
+        })
+
+def _update_page_titles(db, db_type, data):
+    """更新页面标题设置"""
+    api_page_title = data.get('api_page_title', '').strip()
+    frontend_page_title = data.get('frontend_page_title', '').strip()
+    admin_login_title = data.get('admin_login_title', '').strip()
+    
+    if not api_page_title or not frontend_page_title or not admin_login_title:
+        return jsonify({
+            'success': False,
+            'message': '所有页面标题不能为空'
+        })
+    
+    try:
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 更新或插入配置项
+        config_items = [
+            ('api_page_title', api_page_title, 'API取件页面标题'),
+            ('frontend_page_title', frontend_page_title, '前端取件页面标题'),
+            ('admin_login_title', admin_login_title, '管理员登录页面标题')
+        ]
+        
+        for config_key, config_value, description in config_items:
+            if db_type == 'sqlite':
+                # 使用 INSERT OR REPLACE 语法
+                db.execute('''
+                    INSERT OR REPLACE INTO system_config 
+                    (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                    VALUES (?, ?, 'string', ?, 0, 
+                        COALESCE((SELECT created_at FROM system_config WHERE config_key = ?), ?), 
+                        ?)
+                ''', (config_key, config_value, description, config_key, now, now))
+            else:
+                cursor = db.cursor()
+                if db_type == 'mysql':
+                    # MySQL 使用 ON DUPLICATE KEY UPDATE
+                    cursor.execute('''
+                        INSERT INTO system_config 
+                        (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                        VALUES (%s, %s, 'string', %s, 0, %s, %s)
+                        ON DUPLICATE KEY UPDATE 
+                        config_value = VALUES(config_value), 
+                        updated_at = VALUES(updated_at)
+                    ''', (config_key, config_value, description, now, now))
+                else:  # PostgreSQL
+                    # PostgreSQL 使用 ON CONFLICT
+                    cursor.execute('''
+                        INSERT INTO system_config 
+                        (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                        VALUES (%s, %s, 'string', %s, 0, %s, %s)
+                        ON CONFLICT (config_key) DO UPDATE SET 
+                        config_value = EXCLUDED.config_value, 
+                        updated_at = EXCLUDED.updated_at
+                    ''', (config_key, config_value, description, now, now))
+        
+        if db_type == 'sqlite':
+            db.commit()
+        else:
+            db.commit()
+        
+        logger.info(f"Page titles updated: API={api_page_title}, Frontend={frontend_page_title}, Admin={admin_login_title}")
+        
+        return jsonify({
+            'success': True,
+            'message': '页面标题更新成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"Update page titles error: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'更新页面标题失败: {str(e)}'
         })
 
 if __name__ == '__main__':

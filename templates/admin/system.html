@@ -212,10 +212,122 @@
         margin-bottom: 20px;
         color: var(--primary-color);
     }
+
+    /* Form Styles */
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #374151;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: var(--transition);
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-control:read-only {
+        background-color: #f9fafb;
+        color: #6b7280;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    /* Buttons */
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: var(--transition);
+        text-align: center;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 3000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 400px;
+    }
+
+    .toast {
+        padding: 15px 20px;
+        border-radius: 10px;
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        transform: translateX(450px);
+        opacity: 0;
+        transition: all 0.3s ease;
+        position: relative;
+        background: #6b7280;
+        margin-bottom: 10px;
+    }
+
+    .toast.show {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    .toast.success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .toast.error {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .toast.info {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .toast.warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
 </style>
 {% endblock %}
 
 {% block body %}
+<!-- Toast notification container -->
+<div id="toast-container" class="toast-container"></div>
+
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="sidebar-header">
@@ -259,19 +371,90 @@
     </div>
     
     <div class="content">
+        <!-- 管理员账号设置 -->
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">系统配置设置</h2>
+                <h2 class="card-title">👤 管理员账号设置</h2>
             </div>
             <div class="card-body">
-                <div class="feature-intro">
-                    <div class="feature-icon">⚙️</div>
-                    <h3>系统设置中心</h3>
-                    <p>提供系统全局配置和参数设置功能</p>
-                    <p>支持数据库配置、邮件服务器设置、安全选项等</p>
-                    <p>实时保存配置更改，支持配置备份和恢复</p>
-                    <p>系统监控和性能优化配置</p>
-                    <p>功能完善中，敬请期待...</p>
+                <form id="adminAccountForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">管理员用户名</label>
+                            <input type="text" class="form-control" id="adminUsername" name="admin_username" 
+                                   placeholder="输入新的管理员用户名" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">管理员密码</label>
+                            <input type="password" class="form-control" id="adminPassword" name="admin_password" 
+                                   placeholder="输入新的管理员密码" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">确认密码</label>
+                        <input type="password" class="form-control" id="confirmPassword" name="confirm_password" 
+                               placeholder="再次输入密码确认" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="updateAdminAccount()">更新管理员账号</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 页面标题设置 -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🏷️ 页面标题设置</h2>
+            </div>
+            <div class="card-body">
+                <form id="pageTitlesForm">
+                    <div class="form-group">
+                        <label class="form-label">API取件页面标题</label>
+                        <input type="text" class="form-control" id="apiPageTitle" name="api_page_title" 
+                               placeholder="API取件页面" value="API取件页面">
+                        <small style="color: #6b7280;">显示在API取件页面的标题</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">前端取件页面标题</label>
+                        <input type="text" class="form-control" id="frontendPageTitle" name="frontend_page_title" 
+                               placeholder="邮件查看" value="邮件查看">
+                        <small style="color: #6b7280;">显示在前端取件页面的标题</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">管理员登录页面标题</label>
+                        <input type="text" class="form-control" id="adminLoginTitle" name="admin_login_title" 
+                               placeholder="管理员登录" value="管理员登录">
+                        <small style="color: #6b7280;">显示在管理员登录页面的标题</small>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="updatePageTitles()">更新页面标题</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 系统信息 -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">ℹ️ 系统信息</h2>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">系统名称</label>
+                        <input type="text" class="form-control" value="邮件查看系统" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">系统版本</label>
+                        <input type="text" class="form-control" value="2.0.0" readonly>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">数据库类型</label>
+                        <input type="text" class="form-control" id="databaseType" value="SQLite" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">当前管理员</label>
+                        <input type="text" class="form-control" value="{{ admin_username }}" readonly>
+                    </div>
                 </div>
             </div>
         </div>
@@ -281,7 +464,183 @@
 
 {% block scripts %}
 <script>
-    // 页面脚本
+    // Toast通知系统
+    function showToast(message, type = 'info', duration = 3000) {
+        const container = document.getElementById('toast-container') || createToastContainer();
+        
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (container.contains(toast)) {
+                    container.removeChild(toast);
+                }
+            }, 300);
+        }, duration);
+    }
+
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    }
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCurrentSettings();
+    });
+
+    // 加载当前设置
+    function loadCurrentSettings() {
+        // 加载当前管理员信息
+        fetch('/admin/api/system-config')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新当前管理员用户名到输入框
+                    if (data.data.admin_username) {
+                        document.getElementById('adminUsername').value = data.data.admin_username;
+                    }
+                    
+                    // 更新页面标题设置
+                    if (data.data.api_page_title) {
+                        document.getElementById('apiPageTitle').value = data.data.api_page_title;
+                    }
+                    if (data.data.frontend_page_title) {
+                        document.getElementById('frontendPageTitle').value = data.data.frontend_page_title;
+                    }
+                    if (data.data.admin_login_title) {
+                        document.getElementById('adminLoginTitle').value = data.data.admin_login_title;
+                    }
+                    
+                    // 更新数据库类型显示
+                    if (data.data.database_type) {
+                        document.getElementById('databaseType').value = data.data.database_type.toUpperCase();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('加载系统设置失败:', error);
+            });
+    }
+
+    // 更新管理员账号
+    function updateAdminAccount() {
+        const username = document.getElementById('adminUsername').value.trim();
+        const password = document.getElementById('adminPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        // 验证输入
+        if (!username) {
+            showToast('请输入管理员用户名', 'error');
+            return;
+        }
+
+        if (!password) {
+            showToast('请输入管理员密码', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            showToast('两次输入的密码不一致', 'error');
+            return;
+        }
+
+        if (password.length < 4) {
+            showToast('密码长度至少4位', 'error');
+            return;
+        }
+
+        // 确认操作
+        if (!confirm('确定要更新管理员账号吗？更新后需要重新登录。')) {
+            return;
+        }
+
+        const data = {
+            action: 'update_admin',
+            admin_username: username,
+            admin_password: password
+        };
+
+        fetch('/admin/api/system-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('管理员账号更新成功，请重新登录', 'success');
+                // 清空密码字段
+                document.getElementById('adminPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                // 3秒后跳转到登录页
+                setTimeout(() => {
+                    window.location.href = '/admin/logout';
+                }, 3000);
+            } else {
+                showToast(data.message || '更新失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('更新管理员账号失败:', error);
+            showToast('网络错误，请稍后重试', 'error');
+        });
+    }
+
+    // 更新页面标题
+    function updatePageTitles() {
+        const apiPageTitle = document.getElementById('apiPageTitle').value.trim();
+        const frontendPageTitle = document.getElementById('frontendPageTitle').value.trim();
+        const adminLoginTitle = document.getElementById('adminLoginTitle').value.trim();
+
+        // 验证输入
+        if (!apiPageTitle || !frontendPageTitle || !adminLoginTitle) {
+            showToast('请填写所有页面标题', 'error');
+            return;
+        }
+
+        const data = {
+            action: 'update_page_titles',
+            api_page_title: apiPageTitle,
+            frontend_page_title: frontendPageTitle,
+            admin_login_title: adminLoginTitle
+        };
+
+        fetch('/admin/api/system-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('页面标题更新成功', 'success');
+            } else {
+                showToast(data.message || '更新失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('更新页面标题失败:', error);
+            showToast('网络错误，请稍后重试', 'error');
+        });
+    }
+
     console.log('系统设置页面已加载');
 </script>
 {% endblock %}
