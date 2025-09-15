@@ -782,8 +782,8 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">过期时间</label>
-                        <input type="datetime-local" class="form-control" name="expired_at">
-                        <small style="color: #6b7280;">留空则永不过期</small>
+                        <input type="text" class="form-control" name="expired_at" placeholder="支持格式：1天、7天、30天 或具体日期时间">
+                        <small style="color: #6b7280;">支持格式："1天"、"7天"、"30天" 或具体日期时间，留空则永不过期</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">备注</label>
@@ -818,8 +818,8 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">过期时间</label>
-                        <input type="datetime-local" class="form-control" name="expired_at">
-                        <small style="color: #6b7280;">留空则永不过期</small>
+                        <input type="text" class="form-control" name="expired_at" placeholder="支持格式：1天、7天、30天 或具体日期时间">
+                        <small style="color: #6b7280;">支持格式："1天"、"7天"、"30天" 或具体日期时间，留空则永不过期</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">备注</label>
@@ -905,7 +905,8 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">过期时间</label>
-                            <input type="datetime-local" class="form-control" name="expired_at" id="editExpiredAt">
+                            <input type="text" class="form-control" name="expired_at" id="editExpiredAt" placeholder="支持格式：1天、7天、30天 或具体日期时间">
+                            <small style="color: #6b7280;">支持格式："1天"、"7天"、"30天" 或具体日期时间，留空则永不过期</small>
                         </div>
                     </div>
                     
@@ -1036,6 +1037,91 @@
     let allCards = [];
     let filteredCards = [];
 
+    // ========== 日期解析函数 ==========
+    
+    // 解析过期时间输入（支持"1天"、"7天"等格式）
+    function parseExpirationInput(input) {
+        if (!input || input.trim() === '') {
+            return null; // 空值表示永不过期
+        }
+        
+        input = input.trim();
+        
+        // 匹配中文天数格式：1天、7天、30天等
+        const dayMatch = input.match(/^(\d+)天$/);
+        if (dayMatch) {
+            const days = parseInt(dayMatch[1]);
+            const now = new Date();
+            const expirationDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+            return expirationDate.toISOString().slice(0, 19).replace('T', ' '); // MySQL datetime format
+        }
+        
+        // 匹配其他可能的格式：1d、7d等
+        const dayMatchEn = input.match(/^(\d+)d$/i);
+        if (dayMatchEn) {
+            const days = parseInt(dayMatchEn[1]);
+            const now = new Date();
+            const expirationDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+            return expirationDate.toISOString().slice(0, 19).replace('T', ' ');
+        }
+        
+        // 尝试解析具体的日期时间格式
+        try {
+            // 支持 YYYY-MM-DD HH:mm:ss 格式
+            if (input.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+                return input;
+            }
+            
+            // 支持 YYYY-MM-DD HH:mm 格式
+            if (input.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)) {
+                return input + ':00';
+            }
+            
+            // 支持 YYYY-MM-DD 格式（默认23:59:59）
+            if (input.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                return input + ' 23:59:59';
+            }
+            
+            // 尝试解析其他格式并转换为标准格式
+            const date = new Date(input);
+            if (isNaN(date.getTime())) {
+                throw new Error('Invalid date');
+            }
+            return date.toISOString().slice(0, 19).replace('T', ' ');
+        } catch (e) {
+            // 解析失败，返回错误信息
+            throw new Error(`无法解析日期格式："${input}"。支持格式：1天、7天、30天 或 YYYY-MM-DD HH:mm:ss`);
+        }
+    }
+    
+    // 格式化过期时间显示（将数据库格式转换为易读格式）
+    function formatExpirationDisplay(dateString) {
+        if (!dateString) {
+            return '永不过期';
+        }
+        
+        try {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffTime = date.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) {
+                return `已过期 (${formatDateTime(dateString)})`;
+            } else if (diffDays === 0) {
+                return `今天过期 (${formatDateTime(dateString)})`;
+            } else if (diffDays === 1) {
+                return `明天过期 (${formatDateTime(dateString)})`;
+            } else if (diffDays <= 30) {
+                return `${diffDays}天后过期 (${formatDateTime(dateString)})`;
+            } else {
+                return formatDateTime(dateString);
+            }
+        } catch (e) {
+            return dateString;
+        }
+    }
+
     // ========== 工具函数 ==========
     
     // Toast通知系统
@@ -1152,7 +1238,7 @@
                 </td>
                 <td>${card.used_count}/${card.usage_limit}</td>
                 <td>${card.last_used_at || '-'}</td>
-                <td>${card.expired_at || '永不过期'}</td>
+                <td>${formatExpirationDisplay(card.expired_at)}</td>
                 <td>${getBoundEmailInfo(card) || '-'}</td>
                 <td>
                     <div style="font-size: 12px;">
@@ -1415,10 +1501,21 @@
         const form = document.getElementById('generateForm');
         const formData = new FormData(form);
         
+        let expired_at = null;
+        try {
+            const expirationInput = formData.get('expired_at');
+            if (expirationInput && expirationInput.trim()) {
+                expired_at = parseExpirationInput(expirationInput);
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+            return;
+        }
+        
         const data = {
             action: 'generate',
             usage_limit: parseInt(formData.get('usage_limit')),
-            expired_at: formData.get('expired_at') || null,
+            expired_at: expired_at,
             remarks: formData.get('remarks') || ''
         };
 
@@ -1450,11 +1547,22 @@
         const form = document.getElementById('batchGenerateForm');
         const formData = new FormData(form);
         
+        let expired_at = null;
+        try {
+            const expirationInput = formData.get('expired_at');
+            if (expirationInput && expirationInput.trim()) {
+                expired_at = parseExpirationInput(expirationInput);
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+            return;
+        }
+        
         const data = {
             action: 'batch_generate',
             count: parseInt(formData.get('count')),
             usage_limit: parseInt(formData.get('usage_limit')),
-            expired_at: formData.get('expired_at') || null,
+            expired_at: expired_at,
             remarks: formData.get('remarks') || ''
         };
 
@@ -1651,7 +1759,7 @@
         document.getElementById('editCardId').value = card.id;
         document.getElementById('editCardKey').value = card.card_key;
         document.getElementById('editUsageLimit').value = card.usage_limit || 1;
-        document.getElementById('editExpiredAt').value = card.expired_at ? formatDateTimeForInput(card.expired_at) : '';
+        document.getElementById('editExpiredAt').value = card.expired_at || '';
         document.getElementById('editRemarks').value = getCardRemarks(card.remarks) || '';
         document.getElementById('editBoundEmailId').value = card.bound_email_id || '';
         document.getElementById('editEmailDaysFilter').value = card.email_days_filter || 1;
@@ -1668,11 +1776,22 @@
         const form = document.getElementById('editForm');
         const formData = new FormData(form);
         
+        let expired_at = null;
+        try {
+            const expirationInput = formData.get('expired_at');
+            if (expirationInput && expirationInput.trim()) {
+                expired_at = parseExpirationInput(expirationInput);
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+            return;
+        }
+        
         const data = {
             action: 'edit',
             card_id: parseInt(formData.get('card_id')),
             usage_limit: parseInt(formData.get('usage_limit')),
-            expired_at: formData.get('expired_at') || null,
+            expired_at: expired_at,
             remarks: formData.get('remarks') || '',
             bound_email_id: formData.get('bound_email_id') ? parseInt(formData.get('bound_email_id')) : null,
             email_days_filter: parseInt(formData.get('email_days_filter')) || 1,
