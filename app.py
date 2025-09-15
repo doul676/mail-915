@@ -5096,14 +5096,15 @@ def _update_admin_account(db, db_type, data):
             )
             db.commit()
         
-        # 更新会话信息
-        session['admin_username'] = new_username
+        # 安全考虑：更新管理员账号后强制重新登录
+        session.clear()
         
-        logger.info(f"Admin account updated: {new_username}")
+        logger.info(f"Admin account updated: {new_username}, session cleared for security")
         
         return jsonify({
             'success': True,
-            'message': '管理员账号更新成功'
+            'message': '管理员账号更新成功',
+            'force_logout': True  # 指示前端需要强制重新登录
         })
         
     except Exception as e:

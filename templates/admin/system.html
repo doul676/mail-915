@@ -321,6 +321,67 @@
     .toast.warning {
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     }
+    
+    /* Mobile menu toggle button */
+    .mobile-menu-toggle {
+        display: none;
+    }
+    
+    /* Mobile overlay */
+    .mobile-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+    }
+    
+    .mobile-overlay.show {
+        display: block;
+    }
+    
+    /* Responsive styles */
+    @media (max-width: 768px) {
+        .sidebar {
+            transform: translateX(-100%);
+        }
+        
+        .sidebar.mobile-open {
+            transform: translateX(0);
+        }
+        
+        .main-content {
+            margin-left: 0;
+        }
+        
+        .header-title {
+            font-size: 20px;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .mobile-menu-toggle {
+            display: block;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #64748b;
+        }
+        
+        .mobile-menu-toggle:hover {
+            color: var(--primary-color);
+        }
+        
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -328,8 +389,11 @@
 <!-- Toast notification container -->
 <div id="toast-container" class="toast-container"></div>
 
+<!-- Mobile overlay -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
+
 <!-- Sidebar -->
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <div class="sidebar-logo">📧 邮件管理系统</div>
     </div>
@@ -361,7 +425,10 @@
 <!-- Main Content -->
 <div class="main-content">
     <div class="header">
-        <h1 class="header-title">系统设置</h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+            <h1 class="header-title">系统设置</h1>
+        </div>
         <div class="header-actions">
             <div class="user-info">
                 <span>欢迎，{{ admin_username }}</span>
@@ -457,7 +524,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">系统名称</label>
-                        <input type="text" class="form-control" value="邮件查看系统" readonly>
+                        <input type="text" class="form-control" id="systemNameDisplay" value="{{ system_title }}" readonly>
                     </div>
                     <div class="form-group">
                         <label class="form-label">系统版本</label>
@@ -534,6 +601,11 @@
                     // 更新系统标题设置
                     if (data.data.system_title) {
                         document.getElementById('systemTitle').value = data.data.system_title;
+                        // 同时更新系统信息区域的显示
+                        const systemNameDisplay = document.getElementById('systemNameDisplay');
+                        if (systemNameDisplay) {
+                            systemNameDisplay.value = data.data.system_title;
+                        }
                     }
                     
                     // 更新页面标题设置
@@ -606,14 +678,22 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showToast('管理员账号更新成功，请重新登录', 'success');
+                showToast('管理员账号更新成功，为确保安全将立即重新登录', 'success');
                 // 清空密码字段
                 document.getElementById('adminPassword').value = '';
                 document.getElementById('confirmPassword').value = '';
-                // 3秒后跳转到登录页
-                setTimeout(() => {
-                    window.location.href = '/admin/logout';
-                }, 3000);
+                // 检查是否需要强制登出
+                if (data.force_logout) {
+                    // 立即跳转到登录页
+                    setTimeout(() => {
+                        window.location.href = '/admin/logout';
+                    }, 1500);
+                } else {
+                    // 兼容旧逻辑，3秒后跳转
+                    setTimeout(() => {
+                        window.location.href = '/admin/logout';
+                    }, 3000);
+                }
             } else {
                 showToast(data.message || '更新失败', 'error');
             }
@@ -692,6 +772,11 @@
                 showToast('系统标题更新成功，页面标题将即时生效', 'success');
                 // 更新页面标题立即反映变化
                 document.title = document.title.replace(/- .+$/, '- ' + systemTitle);
+                // 更新系统信息区域的系统名称显示
+                const systemNameDisplay = document.getElementById('systemNameDisplay');
+                if (systemNameDisplay) {
+                    systemNameDisplay.value = systemTitle;
+                }
             } else {
                 showToast(data.message || '更新失败', 'error');
             }
@@ -703,5 +788,53 @@
     }
 
     console.log('系统设置页面已加载');
+    
+    // Mobile menu functionality
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        
+        if (sidebar.classList.contains('mobile-open')) {
+            closeMobileMenu();
+        } else {
+            openMobileMenu();
+        }
+    }
+    
+    function openMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        
+        sidebar.classList.add('mobile-open');
+        overlay.classList.add('show');
+    }
+    
+    function closeMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('show');
+    }
+    
+    // Close mobile menu when clicking on navigation items
+    document.addEventListener('DOMContentLoaded', function() {
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Close mobile menu when navigating
+                if (window.innerWidth <= 768) {
+                    closeMobileMenu();
+                }
+            });
+        });
+        
+        // Close mobile menu on window resize if screen becomes large
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                closeMobileMenu();
+            }
+        });
+    });
 </script>
 {% endblock %}
