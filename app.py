@@ -165,6 +165,9 @@ def init_db():
             # 创建卡密回收站表
             create_recycle_bin_table(db, db_type)
             
+            # 创建系统配置表
+            create_system_config_table(db, db_type)
+            
             # 检查是否有默认管理员，如果没有则创建
             create_default_admin(db, db_type)
             
@@ -309,6 +312,58 @@ def create_admin_mail_logs_table(db, db_type):
             cursor.close()
     except Exception as e:
         logger.error(f"Failed to create admin mail logs table: {e}")
+        raise
+
+def create_system_config_table(db, db_type):
+    """创建系统配置表"""
+    try:
+        if db_type == 'sqlite':
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    config_key TEXT NOT NULL UNIQUE,
+                    config_value TEXT NOT NULL,
+                    config_type TEXT DEFAULT 'string',
+                    description TEXT DEFAULT '',
+                    is_system INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        elif db_type == 'mysql':
+            cursor = db.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    config_key VARCHAR(255) NOT NULL UNIQUE,
+                    config_value TEXT NOT NULL,
+                    config_type VARCHAR(50) DEFAULT 'string',
+                    description TEXT DEFAULT '',
+                    is_system TINYINT DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_config_key (config_key)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ''')
+            cursor.close()
+        elif db_type == 'postgresql':
+            cursor = db.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    id SERIAL PRIMARY KEY,
+                    config_key VARCHAR(255) NOT NULL UNIQUE,
+                    config_value TEXT NOT NULL,
+                    config_type VARCHAR(50) DEFAULT 'string',
+                    description TEXT DEFAULT '',
+                    is_system INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_config_key ON system_config (config_key)')
+            cursor.close()
+    except Exception as e:
+        logger.error(f"Failed to create system config table: {e}")
         raise
 
 def create_admin_table(db, db_type):
@@ -911,7 +966,8 @@ def update_proxy_unified_id(db, table_name, proxy_id, unified_id):
 @app.route('/')
 def index():
     """前端首页 - 邮件查看"""
-    return render_template('frontend/index.html')
+    frontend_title = get_system_config('frontend_page_title', '邮件查看系统')
+    return render_template('frontend/index.html', page_title=frontend_title)
 
 # ===============================
 # 管理员认证相关路由
@@ -955,7 +1011,7 @@ def admin_login():
         else:
             error = '请输入用户名和密码'
     
-    return render_template('admin/login.html', error=error)
+    return render_template('admin/login.html', error=error, page_title=get_system_config('admin_login_title', '管理员登录'))
 
 @app.route('/admin/logout')
 def admin_logout():
@@ -971,6 +1027,24 @@ def admin_required(f):
         return f(*args, **kwargs)
     decorated_function.__name__ = f.__name__
     return decorated_function
+
+def get_system_config(key, default_value=''):
+    """获取系统配置值"""
+    try:
+        db = get_db()
+        db_type = app.config['DATABASE_TYPE']
+        
+        if db_type == 'sqlite':
+            result = db.execute('SELECT config_value FROM system_config WHERE config_key = ?', (key,)).fetchone()
+            return result['config_value'] if result else default_value
+        else:
+            cursor = db.cursor()
+            cursor.execute('SELECT config_value FROM system_config WHERE config_key = %s', (key,))
+            result = cursor.fetchone()
+            return result[0] if result else default_value
+    except Exception as e:
+        logger.error(f"Failed to get system config for key {key}: {e}")
+        return default_value
 
 # ===============================
 # 管理员后台页面路由
@@ -3370,6 +3444,7 @@ def _batch_delete_cards(db, data):
         })
     
     try:
+        db_type = app.config['DATABASE_TYPE']  # 获取数据库类型
         success_count = 0
         error_count = 0
         
@@ -3633,13 +3708,15 @@ def api_admin_generate_card_api_page(card_key):
                 card_result = dict(zip(columns, card_result))
         
         if not card_result:
+            # 获取API页面标题
+            api_title = get_system_config('api_page_title', 'API取件页面')
             # 返回包含"此卡密不存在"消息的HTML页面而不是JSON
-            error_content = """<!DOCTYPE html>
+            error_content = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API取件页面 - 卡密不存在</title>
+    <title>{api_title} - 卡密不存在</title>
     <style>
         * {
             margin: 0;
@@ -3716,12 +3793,15 @@ def api_admin_generate_card_api_page(card_key):
                 <button class="get-mail-btn" onclick="getMail()">获取邮件</button>
             </div>"""
         
+        # 获取API页面标题
+        api_title = get_system_config('api_page_title', 'API取件页面')
+        
         api_content = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API取件页面</title>
+    <title>{api_title}</title>
     <style>
         * {{
             margin: 0;
@@ -4194,7 +4274,7 @@ def api_admin_generate_card_api_page(card_key):
     <div class="container">
         <div class="header">
             <h1>📧 API邮件查看</h1>
-            <p>API取件页面</p>
+            <p>{api_title}</p>
         </div>
         
         <div class="main-card">
