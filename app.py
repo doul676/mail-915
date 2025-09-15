@@ -168,6 +168,9 @@ def init_db():
             # 创建系统配置表
             create_system_config_table(db, db_type)
             
+            # 数据库迁移：确保系统标题配置存在
+            migrate_system_title_config(db, db_type)
+            
             # 检查是否有默认管理员，如果没有则创建
             create_default_admin(db, db_type)
             
@@ -364,6 +367,46 @@ def create_system_config_table(db, db_type):
             cursor.close()
     except Exception as e:
         logger.error(f"Failed to create system config table: {e}")
+        raise
+
+def migrate_system_title_config(db, db_type):
+    """迁移系统标题配置：确保system_title配置项存在"""
+    try:
+        # 检查是否已存在system_title配置
+        if db_type == 'sqlite':
+            result = db.execute('SELECT COUNT(*) FROM system_config WHERE config_key = ?', ('system_title',)).fetchone()
+            exists = result[0] > 0
+        else:
+            cursor = db.cursor()
+            cursor.execute('SELECT COUNT(*) FROM system_config WHERE config_key = %s', ('system_title',))
+            result = cursor.fetchone()
+            exists = result[0] > 0
+            cursor.close()
+        
+        if not exists:
+            # 插入默认的system_title配置
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if db_type == 'sqlite':
+                db.execute('''
+                    INSERT INTO system_config 
+                    (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                    VALUES ('system_title', '邮件查看系统', 'string', '系统页面标题', 0, ?, ?)
+                ''', (now, now))
+            else:
+                cursor = db.cursor()
+                cursor.execute('''
+                    INSERT INTO system_config 
+                    (config_key, config_value, config_type, description, is_system, created_at, updated_at)
+                    VALUES ('system_title', %s, 'string', '系统页面标题', 0, %s, %s)
+                ''', ('邮件查看系统', now, now))
+                cursor.close()
+            
+            logger.info("Added system_title configuration to system_config table")
+        else:
+            logger.info("System_title configuration already exists")
+            
+    except Exception as e:
+        logger.error(f"Failed to migrate system_title config: {e}")
         raise
 
 def create_admin_table(db, db_type):
